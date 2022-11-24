@@ -1,21 +1,39 @@
 use bytes::Bytes;
 use sha2::{Digest, Sha256};
+use std::fmt;
 
 #[allow(dead_code)]
 #[derive(Default, Clone)]
 pub struct Block {
     pub timestamp: u32,
+    pub difficulty: u32,
+    pub nonce: u32,
     pub data: Bytes,
     pub hash: Bytes,
     pub prev_hash: Bytes,
-    pub difficulty: u32,
-    pub nonce: u32,
+}
+
+impl fmt::Debug for Block {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Block")
+            .field("nonce", &self.nonce)
+            .field("difficulty", &self.difficulty)
+            .field("timestamp", &self.timestamp)
+            .field("data", &self.data.to_vec())
+            .field("hash", &self.hash.to_vec())
+            .field("prev_hash", &self.prev_hash.to_vec())
+            .finish()
+    }
 }
 
 #[allow(dead_code)]
 impl Block {
     pub fn get_timestamp(&self) -> u32 {
         self.timestamp
+    }
+
+    pub fn get_nonce(&self) -> u32 {
+        self.nonce
     }
 
     pub fn get_data(&self) -> &Bytes {
