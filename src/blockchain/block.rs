@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use rocket::serde::ser::{Serialize, SerializeStruct, Serializer};
 use sha2::{Digest, Sha256};
 use std::fmt;
 
@@ -11,6 +12,22 @@ pub struct Block {
     pub data: Bytes,
     pub hash: Bytes,
     pub prev_hash: Bytes,
+}
+
+impl Serialize for Block {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_struct("Block", 3)?;
+        s.serialize_field("timestamp", &self.timestamp)?;
+        s.serialize_field("difficulty", &self.difficulty)?;
+        s.serialize_field("nonce", &self.nonce)?;
+        s.serialize_field("data", &self.data.to_vec())?;
+        s.serialize_field("hash", &self.hash.to_vec())?;
+        s.serialize_field("prev_hash", &self.prev_hash.to_vec())?;
+        s.end()
+    }
 }
 
 impl fmt::Debug for Block {
@@ -57,7 +74,7 @@ impl Block {
 
 #[cfg(test)]
 mod test {
-    use crate::block::*;
+    use crate::blockchain::block::*;
 
     #[test]
     #[allow(dead_code)]

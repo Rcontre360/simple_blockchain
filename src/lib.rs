@@ -1,2 +1,2 @@
-pub mod block;
-pub mod chain;
+pub mod blockchain;
+pub mod server;

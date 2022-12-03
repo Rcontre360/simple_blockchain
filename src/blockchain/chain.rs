@@ -1,4 +1,4 @@
-use crate::block::Block;
+use crate::blockchain::block::Block;
 use bytes::Bytes;
 
 pub type Chain = Vec<Block>;
@@ -105,8 +105,8 @@ pub fn get_last_block(chain: &Chain) -> &Block {
 
 #[cfg(test)]
 mod test {
-    use crate::block::*;
-    use crate::chain::*;
+    use crate::blockchain::block::*;
+    use crate::blockchain::chain::*;
 
     fn create_chain() -> Chain {
         let mut chain: Vec<Block> = vec![Block::default()];
