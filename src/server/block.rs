@@ -8,9 +8,9 @@ use crate::blockchain::block::Block;
 pub fn get_block(id: usize) -> Json<Block> {
     Json(Block {
         timestamp: 1,
-        data: Bytes::from_static(b"test"),
-        hash: Bytes::from_static(b"test"),
-        prev_hash: Bytes::from_static(b"test"),
+        data: b"test".to_vec(),
+        hash: Block::block_hash(&b"test".to_vec()),
+        prev_hash: Block::block_hash(&b"test".to_vec()),
         difficulty: 4,
         nonce: 4,
     })

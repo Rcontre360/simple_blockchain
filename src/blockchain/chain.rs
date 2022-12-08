@@ -1,11 +1,10 @@
 use crate::blockchain::block::Block;
-use bytes::Bytes;
 
 pub type Chain = Vec<Block>;
 
 pub const BLOCK_TIME: u32 = 1000 * 5; // 5 seconds
 
-pub fn add_block(chain: &mut Chain, timestamp: u32, data: &Bytes) {
+pub fn add_block(chain: &mut Chain, timestamp: u32, data: &Vec<u8>) {
     if chain.is_empty() {
         return;
     }
@@ -13,7 +12,7 @@ pub fn add_block(chain: &mut Chain, timestamp: u32, data: &Bytes) {
     chain.push(create_next_block(chain, timestamp, &data.clone()));
 }
 
-pub fn create_next_block(chain: &Chain, timestamp: u32, data: &Bytes) -> Block {
+pub fn create_next_block(chain: &Chain, timestamp: u32, data: &Vec<u8>) -> Block {
     let block = &chain[chain.len() - 1];
     let difficulty = get_difficulty(chain);
     let (hash, nonce) = generate_next_block_hash(chain, timestamp, data);
@@ -28,7 +27,7 @@ pub fn create_next_block(chain: &Chain, timestamp: u32, data: &Bytes) -> Block {
     }
 }
 
-pub fn generate_next_block_hash(chain: &Chain, timestamp: u32, data: &Bytes) -> (Bytes, u32) {
+pub fn generate_next_block_hash(chain: &Chain, timestamp: u32, data: &Vec<u8>) -> ([u8; 32], u32) {
     let block = &chain[chain.len() - 1];
     let nxt_difficulty = get_difficulty(chain);
 
@@ -45,7 +44,7 @@ pub fn generate_next_block_hash(chain: &Chain, timestamp: u32, data: &Bytes) -> 
             &nonce.to_be_bytes(),
         ]
         .concat();
-        let hash = Block::block_hash(block_hash_data);
+        let hash = Block::block_hash(&block_hash_data);
         let leftover_byte = hash[target_zeroes.len()];
 
         if hash.starts_with(target_zeroes) && (leftover_byte | leftover_target) <= leftover_target {
@@ -85,7 +84,7 @@ pub fn is_valid_chain(chain: &Chain) -> bool {
             println!("equal: {} & {}", hash1[j], hash2[j]);
         }
 
-        if !block.get_hash().eq(nxt_block.get_hash()) {
+        if !block.get_hash().eq(&nxt_block.get_hash()) {
             return false;
         }
     }
@@ -110,7 +109,7 @@ mod test {
 
     fn create_chain() -> Chain {
         let mut chain: Vec<Block> = vec![Block::default()];
-        add_block(&mut chain, 0, &Bytes::from_static(b"first block data"));
+        add_block(&mut chain, 0, &b"first block data".to_vec());
         chain
     }
 
@@ -126,18 +125,14 @@ mod test {
         let timestamp = 5;
         let original_len = chain.len();
 
-        add_block(
-            &mut chain,
-            timestamp,
-            &Bytes::from_static(b"first block data"),
-        );
+        add_block(&mut chain, timestamp, &b"first block data".to_vec());
 
         let nxt_block = get_last_block(&chain);
         let (nxt_hash, nonce) =
             generate_next_block_hash(&chain_copy, nxt_block.get_timestamp(), nxt_block.get_data());
 
         assert_eq!(chain.len(), original_len + 1);
-        assert_eq!(*nxt_block.get_hash(), nxt_hash);
+        assert_eq!(nxt_block.get_hash(), nxt_hash);
         assert_eq!(nxt_block.get_nonce(), nonce);
     }
 
@@ -147,17 +142,13 @@ mod test {
         let mut chain = create_chain();
         let timestamp = 5;
 
-        add_block(
-            &mut chain,
-            timestamp,
-            &Bytes::from_static(b"first block data"),
-        );
+        add_block(&mut chain, timestamp, &b"first block data".to_vec());
 
         chain.push(Block {
             timestamp: 10,
-            data: Bytes::from_static(b"invalid data"),
-            hash: Bytes::from_static(b"invalid hash"),
-            prev_hash: Bytes::from_static(b"invalid hash 2"),
+            data: b"invalid data".to_vec(),
+            hash: Block::block_hash(&b"invalid hash".to_vec()),
+            prev_hash: Block::block_hash(&b"invalid hash 2".to_vec()),
             difficulty: 4,
             nonce: 3,
         });
@@ -170,7 +161,7 @@ mod test {
     fn generate_next_block_hash_test() {
         let chain = create_chain();
         let timestamp = 5;
-        let data = Bytes::from_static(b"some data");
+        let data = b"some data".to_vec();
         let difficulty = get_difficulty(&chain);
 
         let (nxt_block_hash, nonce) = generate_next_block_hash(&chain, timestamp, &data);
@@ -185,7 +176,7 @@ mod test {
 
         let target_zeroes: &[u8] = &vec![0; (difficulty / 8) as usize];
         let leftover_target = 255 / 2u8.pow((difficulty % 8) as u32);
-        let verify_hash = Block::block_hash(block_hash_data);
+        let verify_hash = Block::block_hash(&block_hash_data);
 
         assert!(nxt_block_hash.starts_with(target_zeroes));
         assert!((nxt_block_hash[target_zeroes.len()] | leftover_target) <= leftover_target);
@@ -199,18 +190,15 @@ mod test {
         let timestamp = 5;
         let nxt_timestamp = timestamp + 5;
 
-        add_block(
-            &mut chain,
-            timestamp,
-            &Bytes::from_static(b"first block data"),
-        );
+        add_block(&mut chain, timestamp, &b"first block data".to_vec());
 
         let block = &chain[chain.len() - 1];
-        let nxt_block = create_next_block(&chain, nxt_timestamp, &Bytes::new());
-        let (nxt_hash, nonce) = generate_next_block_hash(&chain, nxt_timestamp, &Bytes::new());
+        let nxt_block = create_next_block(&chain, nxt_timestamp, &b"some data".to_vec());
+        let (nxt_hash, nonce) =
+            generate_next_block_hash(&chain, nxt_timestamp, &b"some data".to_vec());
 
         assert_eq!(nxt_block.get_timestamp(), nxt_timestamp);
-        assert_eq!(*nxt_block.get_prev_hash(), block.get_hash());
-        assert_eq!(*nxt_block.get_hash(), nxt_hash);
+        assert_eq!(nxt_block.get_prev_hash(), block.get_hash());
+        assert_eq!(nxt_block.get_hash(), nxt_hash);
     }
 }
