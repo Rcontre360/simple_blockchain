@@ -80,10 +80,6 @@ pub fn is_valid_chain(chain: &Chain) -> bool {
 
         let hash1 = block.get_hash();
         let hash2 = nxt_block.get_hash();
-        println!("debug: {} & {}", hash1.len(), hash2.len());
-        for j in 0..std::cmp::min(hash1.len(), hash2.len()) {
-            println!("equal: {} & {}", hash1[j], hash2[j]);
-        }
 
         if !block.get_hash().eq(&nxt_block.get_hash()) {
             return false;

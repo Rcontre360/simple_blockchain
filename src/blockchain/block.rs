@@ -3,7 +3,7 @@ use sha2::{Digest, Sha256};
 use std::fmt;
 
 #[allow(dead_code)]
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct Block {
     pub timestamp: u32,
