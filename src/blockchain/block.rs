@@ -8,6 +8,7 @@ use std::fmt;
 pub struct Block {
     pub timestamp: u32,
     pub difficulty: u32,
+    pub block_number: u32,
     pub nonce: u32,
     pub data: Vec<u8>,
     pub hash: [u8; 32],
@@ -34,9 +35,10 @@ impl Block {
             timestamp: 0,
             difficulty: 0,
             nonce: 0,
+            block_number: 0,
             data: Vec::from([]),
-            hash: Block::block_hash(&b"".to_vec()),
-            prev_hash: Block::block_hash(&b"".to_vec()),
+            hash: [0; 32],
+            prev_hash: [0; 32],
         }
     }
 
@@ -58,6 +60,10 @@ impl Block {
 
     pub fn get_prev_hash(&self) -> [u8; 32] {
         self.prev_hash.clone()
+    }
+
+    pub fn get_block_number(&self) -> u32 {
+        self.block_number
     }
 
     pub fn block_hash(bytes: &Vec<u8>) -> [u8; 32] {
@@ -87,6 +93,7 @@ mod test {
         let prev_hash = Block::block_hash(&b"".to_vec());
         let block = Block {
             timestamp,
+            block_number: 0,
             data: data.clone(),
             hash: hash.clone(),
             prev_hash: prev_hash.clone(),

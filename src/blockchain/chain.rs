@@ -18,6 +18,7 @@ pub fn create_next_block(chain: &Chain, timestamp: u32, data: &Vec<u8>) -> Block
     let (hash, nonce) = generate_next_block_hash(chain, timestamp, data);
 
     Block {
+        block_number: 0,
         timestamp,
         difficulty,
         nonce,
@@ -146,6 +147,7 @@ mod test {
 
         chain.push(Block {
             timestamp: 10,
+            block_number: 0,
             data: b"invalid data".to_vec(),
             hash: Block::block_hash(&b"invalid hash".to_vec()),
             prev_hash: Block::block_hash(&b"invalid hash 2".to_vec()),

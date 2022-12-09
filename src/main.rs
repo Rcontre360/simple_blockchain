@@ -14,6 +14,9 @@ fn main() -> Result<()> {
     let block = Block::default();
 
     db.save_block(&block)?;
+    let block = db.get_block(block.get_block_number(), &block.get_hash())?;
+
+    println!("block: {:?}", block);
 
     Ok(())
 }
