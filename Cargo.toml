@@ -10,6 +10,7 @@ bytes = "1.2.1"
 sha2 = "0.10.6"
 tokio = "1.22.0"
 anyhow = "1.0"
+hex = "0.4"
 rocket = {version="0.5.0-rc.2" , features=["json"]}
 redis = { version = "0.22.1", features = ["tokio-comp", "json"] }
 

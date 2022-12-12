@@ -2,6 +2,8 @@ use rocket::serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt;
 
+pub type BlockHash = [u8; 32];
+
 #[allow(dead_code)]
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
@@ -11,8 +13,8 @@ pub struct Block {
     pub block_number: u32,
     pub nonce: u32,
     pub data: Vec<u8>,
-    pub hash: [u8; 32],
-    pub prev_hash: [u8; 32],
+    pub hash: BlockHash,
+    pub prev_hash: BlockHash,
 }
 
 impl fmt::Debug for Block {
@@ -35,9 +37,9 @@ impl Block {
             timestamp: 0,
             difficulty: 0,
             nonce: 0,
-            block_number: 0,
+            block_number: 1,
             data: Vec::from([]),
-            hash: [0; 32],
+            hash: [2; 32],
             prev_hash: [0; 32],
         }
     }
@@ -54,22 +56,22 @@ impl Block {
         &self.data
     }
 
-    pub fn get_hash(&self) -> [u8; 32] {
-        self.hash.clone()
+    pub fn get_hash(&self) -> BlockHash {
+        self.hash
     }
 
-    pub fn get_prev_hash(&self) -> [u8; 32] {
-        self.prev_hash.clone()
+    pub fn get_prev_hash(&self) -> BlockHash {
+        self.prev_hash
     }
 
     pub fn get_block_number(&self) -> u32 {
         self.block_number
     }
 
-    pub fn block_hash(bytes: &Vec<u8>) -> [u8; 32] {
+    pub fn block_hash(bytes: &Vec<u8>) -> BlockHash {
         let mut hasher = Sha256::new();
         hasher.update(bytes);
-        let res: [u8; 32] = hasher
+        let res: BlockHash = hasher
             .finalize()
             .to_vec()
             .try_into()
