@@ -1,5 +1,5 @@
 use anyhow::Result;
-use hex::encode;
+use hex::{decode, encode};
 use redis::{from_redis_value, Client as RedisClient, Connection, JsonCommands, Value};
 use rocket::serde::json::from_str;
 
@@ -46,12 +46,23 @@ impl Client {
     pub fn save_block(&mut self, block: &Block) -> Result<bool> {
         let block_key = Client::block_key(&block.get_hash());
         let hash_key = Client::hash_key(block.get_block_number());
+        println!("hash_key: {:?}", hash_key);
 
         self.connection_instance.json_set(block_key, ".", block)?;
         self.connection_instance
             .json_set(hash_key, ".", &block.get_hash())?;
 
         Ok(true)
+    }
+
+    pub fn get_block_by_str(&mut self, block_hash: &String) -> Result<Block> {
+        let hash = decode(block_hash).unwrap();
+        self.get_block_by_vec(&hash)
+    }
+
+    pub fn get_block_by_vec(&mut self, block_hash: &Vec<u8>) -> Result<Block> {
+        let hash: &[u8; 32] = &block_hash[..32].try_into().unwrap();
+        self.get_block_by_hash(hash)
     }
 
     pub fn get_block_by_hash(&mut self, block_hash: &BlockHash) -> Result<Block> {

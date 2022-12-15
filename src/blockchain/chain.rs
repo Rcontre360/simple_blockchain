@@ -1,6 +1,7 @@
 use crate::blockchain::block::{Block, BlockHash};
 use crate::storage::Client;
 use anyhow::Result;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const BLOCK_TIME: u32 = 1000 * 5; // 5 seconds
 
@@ -22,24 +23,30 @@ impl Chain {
         Ok(chain)
     }
 
-    pub fn add_block(&mut self, timestamp: u32, data: &Vec<u8>) -> Result<bool> {
+    pub fn mine_block(&mut self, data: &Vec<u8>) -> Result<bool> {
+        let start = SystemTime::now();
+
         if self.hashes.is_empty() {
             return Ok(false);
         }
 
+        let timestamp = start
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
         let nxt_block = self.create_next_block(timestamp, &data.clone())?;
-        self.hashes.push(nxt_block);
+        self.client.save_block(&nxt_block)?;
+        self.hashes.push(nxt_block.get_hash());
 
         Ok(true)
     }
 
-    pub fn create_next_block(&mut self, timestamp: u32, data: &Vec<u8>) -> Result<BlockHash> {
+    pub fn create_next_block(&mut self, timestamp: u32, data: &Vec<u8>) -> Result<Block> {
         let block = self.get_last_block()?;
         let difficulty = self.get_difficulty()?;
         let (hash, nonce) = self.generate_next_block_hash(timestamp, data)?;
 
         let result = Block {
-            block_number: 0,
+            block_number: self.hashes.len(),
             timestamp,
             difficulty,
             nonce,
@@ -48,7 +55,7 @@ impl Chain {
             prev_hash: block.get_hash().clone(),
         };
 
-        Ok(result.get_hash())
+        Ok(result)
     }
 
     pub fn get_block_by_chain_index(&mut self, index: usize) -> Result<Block> {
@@ -151,7 +158,7 @@ mod test {
 
     fn create_chain() -> Result<Chain> {
         let mut chain = Chain::new()?;
-        chain.add_block(0, &b"first block data".to_vec());
+        chain.mine_block(0, &b"first block data".to_vec());
         Ok(chain)
     }
 
@@ -167,7 +174,7 @@ mod test {
         //let timestamp = 5;
         //let original_len = chain.len();
 
-        //chain.add_block(timestamp, &b"first block data".to_vec());
+        //chain.mine_block(timestamp, &b"first block data".to_vec());
 
         //let nxt_block = get_last_block(&chain);
         //let (nxt_hash, nonce) =
@@ -184,9 +191,9 @@ mod test {
         //let mut chain = create_chain()?;
         //let timestamp = 5;
 
-        //chain.add_block(timestamp, &b"first block data".to_vec());
+        //chain.mine_block(timestamp, &b"first block data".to_vec());
 
-        //chain.add_block(Block {
+        //chain.mine_block(Block {
         //timestamp: 10,
         //block_number: 0,
         //data: b"invalid data".to_vec(),
@@ -234,7 +241,7 @@ mod test {
         //let timestamp = 5;
         //let nxt_timestamp = timestamp + 5;
 
-        //add_block(&mut chain, timestamp, &b"first block data".to_vec());
+        //mine_block(&mut chain, timestamp, &b"first block data".to_vec());
 
         //let block = &chain[chain.len() - 1];
         //let nxt_block = create_next_block(&chain, nxt_timestamp, &b"some data".to_vec());

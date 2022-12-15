@@ -1,4 +1,5 @@
 use anyhow::Error;
+use hex::decode;
 use rocket::get;
 use rocket::serde::json::Json;
 
@@ -24,9 +25,7 @@ pub fn get_block_by_hash(block_hash: String) -> Result<Json<Block>> {
         let parts: Vec<&str> = block_hash.split('x').collect();
         final_hash = String::from(parts[1]).to_lowercase();
     }
-
-    let hash: Option<[u8; 32]> = block_hash.as_bytes().try_into().ok();
-    let block = client.get_block_by_hash(&hash.unwrap())?;
+    let block = client.get_block_by_str(&final_hash)?;
 
     Ok(Json(block))
 }

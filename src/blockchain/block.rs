@@ -10,7 +10,7 @@ pub type BlockHash = [u8; 32];
 pub struct Block {
     pub timestamp: u32,
     pub difficulty: u32,
-    pub block_number: u32,
+    pub block_number: usize,
     pub nonce: u32,
     pub data: Vec<u8>,
     pub hash: BlockHash,
@@ -64,7 +64,7 @@ impl Block {
         self.prev_hash
     }
 
-    pub fn get_block_number(&self) -> u32 {
+    pub fn get_block_number(&self) -> usize {
         self.block_number
     }
 
