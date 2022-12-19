@@ -1,9 +1,11 @@
 use crate::blockchain::block::{Block, BlockHash};
 use crate::storage::Client;
 use anyhow::Result;
+use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const BLOCK_TIME: u32 = 1000 * 5; // 5 seconds
+pub const SYNC_NODE_ID: usize = 0;
 
 pub struct Chain {
     client: Client,
@@ -11,16 +13,70 @@ pub struct Chain {
 }
 
 impl Chain {
+    fn sync_chain(mut chain: &Chain) -> Result<JoinHandle<()>> {
+        let last_block = chain.client.get_last_block()?;
+        let last_block_number = last_block.get_block_number();
+
+        let join_handle = std::thread::spawn(move || {
+            let cur_block_number = 0;
+            loop {
+                let nxt_block = chain
+                    .client
+                    .get_block_by_number(cur_block_number)
+                    .unwrap_or(Block::default());
+
+                chain.add_validate_block(&nxt_block)?;
+
+                if nxt_block.get_block_number() == last_block_number {
+                    break;
+                } else {
+                    cur_block_number += 1;
+                }
+            }
+            Ok(())
+        });
+
+        Ok(join_handle)
+    }
+
     pub fn new() -> Result<Chain> {
         let mut chain = Chain {
-            client: Client::new()?,
+            client: Client::new(SYNC_NODE_ID.to_string())?,
             hashes: vec![],
         };
-        let genesis_block = &Block::default();
-        chain.hashes.push(genesis_block.get_hash());
-        chain.client.save_block(genesis_block)?;
+        Chain::sync_chain(&chain);
+        //let genesis_block = &Block::default();
+        //chain.hashes.push(genesis_block.get_hash());
+        //chain.client.save_block(genesis_block)?;
 
         Ok(chain)
+    }
+
+    pub fn add_validate_block(&mut self, block: &Block) -> Result<bool> {
+        let timestamp = block.get_timestamp();
+        let data = block.get_data();
+        let difficulty = block.get_difficulty();
+        let nonce = block.get_nonce();
+        let last_block = self.get_last_block()?;
+
+        let block_hash_data = [
+            &timestamp.to_be_bytes(),
+            &data[..],
+            &last_block.get_hash()[..],
+            &difficulty.to_be_bytes(),
+            &nonce.to_be_bytes(),
+        ]
+        .concat();
+
+        let hash = Block::block_hash(&block_hash_data);
+
+        if hash != block.get_hash() {
+            //ERROR
+            return Ok(false);
+        }
+
+        self.hashes.push(hash);
+        Ok(true)
     }
 
     pub fn mine_block(&mut self, data: &Vec<u8>) -> Result<bool> {
@@ -33,14 +89,14 @@ impl Chain {
         let timestamp = start
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards");
-        let nxt_block = self.create_next_block(timestamp, &data.clone())?;
+        let nxt_block = self.create_next_block(timestamp.as_secs(), &data.clone())?;
         self.client.save_block(&nxt_block)?;
         self.hashes.push(nxt_block.get_hash());
 
         Ok(true)
     }
 
-    pub fn create_next_block(&mut self, timestamp: u32, data: &Vec<u8>) -> Result<Block> {
+    pub fn create_next_block(&mut self, timestamp: u64, data: &Vec<u8>) -> Result<Block> {
         let block = self.get_last_block()?;
         let difficulty = self.get_difficulty()?;
         let (hash, nonce) = self.generate_next_block_hash(timestamp, data)?;
@@ -73,7 +129,7 @@ impl Chain {
 
     pub fn generate_next_block_hash(
         &mut self,
-        timestamp: u32,
+        timestamp: u64,
         data: &Vec<u8>,
     ) -> Result<(BlockHash, u32)> {
         let block = self.get_last_block()?;
@@ -111,15 +167,15 @@ impl Chain {
             let prev_block = self
                 .client
                 .get_block_by_hash(&self.hashes[self.hashes.len() - 2])?;
-            prev_block.get_timestamp()
+            prev_block.get_difficulty()
         } else {
             0
         };
 
-        let res = if last_block.get_timestamp() - prev_timestamp > BLOCK_TIME {
-            last_block.get_timestamp() - 1
+        let res = if last_block.get_difficulty() - prev_timestamp > BLOCK_TIME {
+            last_block.get_difficulty() - 1
         } else {
-            last_block.get_timestamp() + 1
+            last_block.get_difficulty() + 1
         };
 
         Ok(res)

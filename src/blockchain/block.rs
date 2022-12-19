@@ -8,7 +8,7 @@ pub type BlockHash = [u8; 32];
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct Block {
-    pub timestamp: u32,
+    pub timestamp: u64,
     pub difficulty: u32,
     pub block_number: usize,
     pub nonce: u32,
@@ -44,8 +44,12 @@ impl Block {
         }
     }
 
-    pub fn get_timestamp(&self) -> u32 {
+    pub fn get_timestamp(&self) -> u64 {
         self.timestamp
+    }
+
+    pub fn get_difficulty(&self) -> u32 {
+        self.difficulty
     }
 
     pub fn get_nonce(&self) -> u32 {
