@@ -28,12 +28,17 @@ impl Client {
         })
     }
 
-    fn get_node_id(&self) -> String {
-        self.node_id
+    pub fn default() -> Result<Client> {
+        let node_id = dotenv::var("NODE_ID")?;
+        Client::new(node_id)
     }
 
-    fn block_key(hash: &BlockHash) -> Result<String> {
-        let mut prefix = get_node_id();
+    fn get_node_id(&self) -> String {
+        self.node_id.clone()
+    }
+
+    fn block_key(&self, hash: &BlockHash) -> Result<String> {
+        let mut prefix = self.get_node_id();
         let vec_hash = &encode(hash);
 
         prefix.push_str("::block::0x");
@@ -41,8 +46,8 @@ impl Client {
         Ok(prefix)
     }
 
-    fn hash_key(number: usize) -> Result<String> {
-        let mut prefix = get_node_id();
+    fn hash_key(&self, number: usize) -> Result<String> {
+        let mut prefix = self.get_node_id();
         let vec_number = &encode(number.to_be_bytes());
 
         prefix.push_str("::bock_hash::0x");
@@ -61,19 +66,6 @@ impl Client {
         count_str.parse().unwrap_or(0)
     }
 
-    pub fn save_block(&mut self, block: &Block) -> Result<bool> {
-        let block_key = Client::block_key(&block.get_hash())?;
-        let hash_key = Client::hash_key(block.get_block_number())?;
-
-        self.connection_instance
-            .json_set(COUNT_KEY, ".", &block.get_block_number())?;
-        self.connection_instance.json_set(block_key, ".", block)?;
-        self.connection_instance
-            .json_set(hash_key, ".", &block.get_hash())?;
-
-        Ok(true)
-    }
-
     pub fn get_block_by_str(&mut self, block_hash: &String) -> Result<Block> {
         let hash = decode(block_hash).unwrap();
         self.get_block_by_vec(&hash)
@@ -85,7 +77,7 @@ impl Client {
     }
 
     pub fn get_block_by_hash(&mut self, block_hash: &BlockHash) -> Result<Block> {
-        let hash_key = &Client::block_key(block_hash)?;
+        let hash_key = &self.block_key(block_hash)?;
         let raw_block = self.get_data(hash_key)?;
         let block: Block = from_str(&raw_block)?;
 
@@ -93,11 +85,11 @@ impl Client {
     }
 
     pub fn get_block_by_number(&mut self, block_number: usize) -> Result<Block> {
-        let num_key = &Client::hash_key(block_number)?;
+        let num_key = &self.hash_key(block_number)?;
         let raw_hash = self.get_data(num_key)?;
         let hash = from_str(&raw_hash)?;
 
-        let hash_key = Client::block_key(&hash)?;
+        let hash_key = self.block_key(&hash)?;
         let raw_block = self.get_data(&hash_key)?;
         let block: Block = from_str(&raw_block)?;
 
@@ -109,10 +101,27 @@ impl Client {
         self.get_block_by_number(last_block_number)
     }
 
+    pub fn set_node_id(&mut self, id: String) {
+        self.node_id = id;
+    }
+
+    pub fn save_block(&mut self, block: &Block) -> Result<bool> {
+        let block_key = self.block_key(&block.get_hash())?;
+        let hash_key = self.hash_key(block.get_block_number())?;
+
+        self.connection_instance
+            .json_set(COUNT_KEY, ".", &block.get_block_number())?;
+        self.connection_instance.json_set(block_key, ".", block)?;
+        self.connection_instance
+            .json_set(hash_key, ".", &block.get_hash())?;
+
+        Ok(true)
+    }
+
     pub fn delete_block(&mut self, block_hash: &BlockHash) -> Result<bool> {
         let block = self.get_block_by_hash(block_hash)?;
-        let block_key = Client::block_key(&block.get_hash())?;
-        let hash_key = Client::hash_key(block.get_block_number())?;
+        let block_key = self.block_key(&block.get_hash())?;
+        let hash_key = self.hash_key(block.get_block_number())?;
 
         self.connection_instance.json_del(block_key, ".")?;
         self.connection_instance.json_del(hash_key, ".")?;
@@ -136,7 +145,7 @@ mod test {
     #[test]
     #[allow(dead_code)]
     fn save_and_get_block() -> Result<()> {
-        let mut db = Client::new()?;
+        let mut db = Client::default()?;
         let block = Block::default();
 
         db.save_block(&block)?;

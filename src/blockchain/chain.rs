@@ -1,6 +1,7 @@
 use crate::blockchain::block::{Block, BlockHash};
 use crate::storage::Client;
 use anyhow::Result;
+use core::panic;
 use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -10,46 +11,63 @@ pub const SYNC_NODE_ID: usize = 0;
 pub struct Chain {
     client: Client,
     pub hashes: Vec<BlockHash>,
+    pub synced: bool,
 }
 
 impl Chain {
-    fn sync_chain(mut chain: &Chain) -> Result<JoinHandle<()>> {
+    fn sync_chain(mut chain: Chain) -> Result<JoinHandle<Chain>> {
         let last_block = chain.client.get_last_block()?;
         let last_block_number = last_block.get_block_number();
 
         let join_handle = std::thread::spawn(move || {
-            let cur_block_number = 0;
+            let mut cur_block_number = 0;
+            let node_id = dotenv::var("NODE_ID").unwrap();
+
+            if node_id == "0" {
+                return chain;
+            }
+
             loop {
                 let nxt_block = chain
                     .client
                     .get_block_by_number(cur_block_number)
                     .unwrap_or(Block::default());
 
-                chain.add_validate_block(&nxt_block)?;
+                let is_valid = chain.add_validate_block(&nxt_block).unwrap();
 
-                if nxt_block.get_block_number() == last_block_number {
+                if nxt_block.get_block_number() == last_block_number && is_valid {
                     break;
-                } else {
+                } else if is_valid {
                     cur_block_number += 1;
+                } else {
+                    panic!("INVALID CHAIN");
                 }
+
+                chain.client.set_node_id(node_id.clone());
+                chain.client.save_block(&nxt_block).unwrap();
+                chain.client.set_node_id(SYNC_NODE_ID.to_string());
             }
-            Ok(())
+
+            chain.set_synced(true);
+
+            chain
         });
 
         Ok(join_handle)
     }
 
-    pub fn new() -> Result<Chain> {
-        let mut chain = Chain {
-            client: Client::new(SYNC_NODE_ID.to_string())?,
+    pub fn new() -> Chain {
+        Chain {
+            client: Client::new(SYNC_NODE_ID.to_string()).unwrap(),
             hashes: vec![],
-        };
-        Chain::sync_chain(&chain);
-        //let genesis_block = &Block::default();
-        //chain.hashes.push(genesis_block.get_hash());
-        //chain.client.save_block(genesis_block)?;
+            synced: false,
+        }
+    }
 
-        Ok(chain)
+    pub fn sync(mut self) -> Result<JoinHandle<Chain>> {
+        let sync_handler = Chain::sync_chain(self)?;
+
+        Ok(sync_handler)
     }
 
     pub fn add_validate_block(&mut self, block: &Block) -> Result<bool> {
@@ -79,7 +97,7 @@ impl Chain {
         Ok(true)
     }
 
-    pub fn mine_block(&mut self, data: &Vec<u8>) -> Result<bool> {
+    pub fn mine_block(&mut self, data: Vec<u8>, hash: BlockHash, nonce: u32) -> Result<bool> {
         let start = SystemTime::now();
 
         if self.hashes.is_empty() {
@@ -89,17 +107,22 @@ impl Chain {
         let timestamp = start
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards");
-        let nxt_block = self.create_next_block(timestamp.as_secs(), &data.clone())?;
+        let nxt_block = self.create_next_block(timestamp.as_secs(), nonce, hash, data)?;
+
         self.client.save_block(&nxt_block)?;
         self.hashes.push(nxt_block.get_hash());
-
         Ok(true)
     }
 
-    pub fn create_next_block(&mut self, timestamp: u64, data: &Vec<u8>) -> Result<Block> {
+    pub fn create_next_block(
+        &mut self,
+        timestamp: u64,
+        nonce: u32,
+        hash: BlockHash,
+        data: Vec<u8>,
+    ) -> Result<Block> {
         let block = self.get_last_block()?;
         let difficulty = self.get_difficulty()?;
-        let (hash, nonce) = self.generate_next_block_hash(timestamp, data)?;
 
         let result = Block {
             block_number: self.hashes.len(),
@@ -112,6 +135,10 @@ impl Chain {
         };
 
         Ok(result)
+    }
+
+    pub fn set_synced(&mut self, is_synced: bool) {
+        self.synced = is_synced;
     }
 
     pub fn get_block_by_chain_index(&mut self, index: usize) -> Result<Block> {
@@ -130,16 +157,16 @@ impl Chain {
     pub fn generate_next_block_hash(
         &mut self,
         timestamp: u64,
-        data: &Vec<u8>,
-    ) -> Result<(BlockHash, u32)> {
-        let block = self.get_last_block()?;
-        let nxt_difficulty = self.get_difficulty()?;
+        data: Vec<u8>,
+    ) -> JoinHandle<(BlockHash, u32)> {
+        let block = self.get_last_block().unwrap_or(Block::default());
+        let nxt_difficulty = self.get_difficulty().unwrap_or(0);
 
-        let mut nonce: u32 = 0;
-        let target_zeroes: &[u8] = &vec![0; (nxt_difficulty / 8) as usize];
-        let leftover_target = 255 / 2u8.pow((nxt_difficulty % 8) as u32);
-
-        loop {
+        std::thread::spawn(move || loop {
+            let mut nonce: u32 = 0;
+            let target_zeroes: &[u8] = &vec![0; (nxt_difficulty / 8) as usize];
+            let leftover_target = 255 / 2u8.pow((nxt_difficulty % 8) as u32);
+            let data = &data;
             let block_hash_data = [
                 &timestamp.to_be_bytes(),
                 &data[..],
@@ -154,10 +181,10 @@ impl Chain {
             if hash.starts_with(target_zeroes)
                 && (leftover_byte | leftover_target) <= leftover_target
             {
-                return Ok((hash, nonce));
+                break (hash, nonce);
             }
             nonce += 1;
-        }
+        })
     }
 
     pub fn get_difficulty(&mut self) -> Result<u32> {
@@ -213,7 +240,7 @@ mod test {
     use crate::blockchain::chain::*;
 
     fn create_chain() -> Result<Chain> {
-        let mut chain = Chain::new()?;
+        let mut chain = Chain::default()?;
         chain.mine_block(0, &b"first block data".to_vec());
         Ok(chain)
     }
