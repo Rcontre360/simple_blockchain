@@ -10,7 +10,7 @@ type Result<T, E = rocket::response::Debug<Error>> = std::result::Result<T, E>;
 
 #[get("/block/number/<block_number>")]
 pub fn get_block_by_number(block_number: usize) -> Result<Json<Block>> {
-    let mut client = Client::default()?;
+    let mut client = Client::default();
     let block = client.get_block_by_number(block_number)?;
 
     Ok(Json(block))
@@ -18,7 +18,7 @@ pub fn get_block_by_number(block_number: usize) -> Result<Json<Block>> {
 
 #[get("/block/hash/<block_hash>")]
 pub fn get_block_by_hash(block_hash: String) -> Result<Json<Block>> {
-    let mut client = Client::default()?;
+    let mut client = Client::default();
     let mut final_hash = block_hash.clone();
 
     if (block_hash.chars().nth(1).unwrap() == 'x') {
@@ -32,7 +32,7 @@ pub fn get_block_by_hash(block_hash: String) -> Result<Json<Block>> {
 
 #[get("/latest")]
 pub fn get_latest_block() -> Result<Json<Block>> {
-    let mut client = Client::default()?;
+    let mut client = Client::default();
     let block = client.get_last_block()?;
 
     Ok(Json(block))
@@ -40,7 +40,7 @@ pub fn get_latest_block() -> Result<Json<Block>> {
 
 #[get("/mine")]
 pub fn mine_block() -> Result<Json<Block>> {
-    let mut db = Client::default()?;
+    let mut db = Client::default();
     let block = Block::default();
 
     db.save_block(&block)?;

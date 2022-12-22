@@ -2,6 +2,7 @@ use crate::blockchain::block::{Block, BlockHash};
 use crate::storage::Client;
 use anyhow::Result;
 use core::panic;
+use crossbeam::channel::Sender;
 use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -14,8 +15,27 @@ pub struct Chain {
     pub synced: bool,
 }
 
+impl Default for Chain {
+    fn default() -> Self {
+        let node_id = dotenv::var("NODE_ID").unwrap();
+        Chain {
+            client: Client::new(node_id).unwrap(),
+            hashes: vec![],
+            synced: false,
+        }
+    }
+}
+
 impl Chain {
-    fn sync_chain(mut chain: Chain) -> Result<JoinHandle<Chain>> {
+    pub fn new() -> Self {
+        Chain {
+            client: Client::new(SYNC_NODE_ID.to_string()).unwrap(),
+            hashes: vec![],
+            synced: false,
+        }
+    }
+
+    fn sync_chain(mut chain: Chain, send_finish: Sender<bool>) -> Result<JoinHandle<Chain>> {
         let last_block = chain.client.get_last_block()?;
         let last_block_number = last_block.get_block_number();
 
@@ -49,6 +69,7 @@ impl Chain {
             }
 
             chain.set_synced(true);
+            send_finish.send(true).unwrap();
 
             chain
         });
@@ -56,16 +77,8 @@ impl Chain {
         Ok(join_handle)
     }
 
-    pub fn new() -> Chain {
-        Chain {
-            client: Client::new(SYNC_NODE_ID.to_string()).unwrap(),
-            hashes: vec![],
-            synced: false,
-        }
-    }
-
-    pub fn sync(mut self) -> Result<JoinHandle<Chain>> {
-        let sync_handler = Chain::sync_chain(self)?;
+    pub fn sync(mut self, send_finish: Sender<bool>) -> Result<JoinHandle<Chain>> {
+        let sync_handler = Chain::sync_chain(self, send_finish)?;
 
         Ok(sync_handler)
     }

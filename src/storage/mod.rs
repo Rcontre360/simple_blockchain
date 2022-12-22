@@ -17,6 +17,13 @@ pub struct Client {
     node_id: String,
 }
 
+impl Default for Client {
+    fn default() -> Self {
+        let node_id = dotenv::var("NODE_ID").unwrap_or("0".to_string());
+        Client::new(node_id).unwrap()
+    }
+}
+
 impl Client {
     pub fn new(node_id: String) -> Result<Client> {
         let client = RedisClient::open(DB_ENDPOINT)?;
@@ -26,11 +33,6 @@ impl Client {
             connection_instance,
             node_id,
         })
-    }
-
-    pub fn default() -> Result<Client> {
-        let node_id = dotenv::var("NODE_ID")?;
-        Client::new(node_id)
     }
 
     fn get_node_id(&self) -> String {

@@ -1,6 +1,7 @@
-use std::thread::JoinHandle;
+use std::{sync::Arc, thread::JoinHandle};
 
 use anyhow::Result;
+use crossbeam::channel::Receiver;
 use redis::{Client as RedisClient, Commands, Connection, ControlFlow, Msg, PubSubCommands};
 use rocket::serde::json::serde_json::to_string;
 
@@ -14,13 +15,20 @@ fn get_connection() -> Connection {
     client.get_connection().unwrap()
 }
 
-pub fn listen(mut callback: impl FnMut(String, String) + Send + Sync + 'static) -> JoinHandle<()> {
+pub fn listen<T>(
+    mut callback: impl FnMut(String, String, T) + Send + Sync + 'static,
+    context_receiver: Receiver<T>,
+) -> JoinHandle<()>
+where
+    T: Send + 'static,
+{
     let mut con = get_connection();
     std::thread::spawn(move || {
         con.subscribe(&[MAIN_CHANNEL], |msg: Msg| {
             let channel = msg.get_channel_name().to_string();
             let payload: String = msg.get_payload().unwrap();
-            callback(channel, payload);
+            let context = context_receiver.recv().unwrap();
+            callback(channel, payload, context);
 
             ControlFlow::<()>::Continue
         })
